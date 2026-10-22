@@ -35,6 +35,7 @@
     <div class="site-info">
       <span class="site-name">{{ site.title }}</span>
       <span class="site-desc" v-if="site.description">{{ site.description }}</span>
+      <span class="site-domain" v-else-if="displayDomain">{{ displayDomain }}</span>
     </div>
     <span class="site-goto">&#8599;</span>
   </a>
@@ -56,6 +57,14 @@ const favoritesStore = useFavoritesStore();
 
 const firstLetter = computed(() => {
   return props.site.title ? props.site.title.charAt(0).toUpperCase() : '?';
+});
+
+const displayDomain = computed(() => {
+  try {
+    return new URL(props.site.url).hostname.replace(/^www\./, '');
+  } catch (e) {
+    return '';
+  }
 });
 
 // Cache isFavorite as a single computed per card (was called 3x in template)
