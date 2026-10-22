@@ -32,18 +32,6 @@ const routes = [
                 meta: { title: '站点管理' },
             },
             {
-                path: 'users',
-                name: 'Users',
-                component: () => import('../views/UsersView.vue'),
-                meta: { title: '用户管理' },
-            },
-            {
-                path: 'analytics',
-                name: 'Analytics',
-                component: () => import('../views/AnalyticsView.vue'),
-                meta: { title: '数据统计' },
-            },
-            {
                 path: 'bookmarks',
                 name: 'Bookmarks',
                 component: () => import('../views/BookmarksView.vue'),
@@ -54,6 +42,18 @@ const routes = [
                 name: 'Ads',
                 component: () => import('../views/AdsView.vue'),
                 meta: { title: '广告管理' },
+            },
+            {
+                path: 'users',
+                name: 'Users',
+                component: () => import('../views/UsersView.vue'),
+                meta: { title: '用户管理' },
+            },
+            {
+                path: 'analytics',
+                name: 'Analytics',
+                component: () => import('../views/AnalyticsView.vue'),
+                meta: { title: '数据统计' },
             },
             {
                 path: 'settings',

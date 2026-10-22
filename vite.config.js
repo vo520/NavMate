@@ -6,13 +6,13 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
     build: {
         sourcemap: false,
-        rollupOptions: {
+        chunkSizeWarningLimit: 1600,
+        rolldownOptions: {
             output: {
                 // Split long-lived vendor libraries into their own chunks so
                 // app-code releases don't invalidate the browser cache for
-                // the (large) UI framework code. (advancedChunks is the
-                // Rolldown-native form; object-style manualChunks is gone.)
-                advancedChunks: {
+                // the large UI framework code.
+                codeSplitting: {
                     groups: [
                         { name: 'chunk-antd', test: /[\\/]node_modules[\\/]antdv-next[\\/]/ },
                         { name: 'chunk-echarts', test: /[\\/]node_modules[\\/]echarts[\\/]/ },

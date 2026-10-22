@@ -302,46 +302,47 @@ class BookmarkParserService
         }
 
         $skipDuplicate = $options['skip_duplicate'] ?? true;
+        $functionalMode = ($options['import_mode'] ?? null) === 'functional';
         $parentCategoryId = $options['parent_category_id'] ?? null;
         $existingUrls = Site::pluck('url')->flip()->toArray();
         $pathCache = [];
+        $categoryCache = [];
 
         // Pre-calculate next sort_order to avoid repeated MAX() queries
         $nextSortOrder = (Category::max('sort_order') ?? 0) + 1;
+
+        if ($functionalMode && ! $parentCategoryId) {
+            $rootCategory = $this->firstOrCreateCategory('导入书签', null, $imported, $nextSortOrder, $categoryCache, [
+                'icon' => 'io-quanbu-qitafenlei',
+                'sort_order' => 0,
+            ]);
+            $parentCategoryId = $rootCategory->id;
+        }
 
         foreach ($flat as $group) {
             if (empty($group['bookmarks'])) {
                 continue;
             }
 
-            $categoryName = $group['folder'] ?: '未分类书签';
-
-            // Resolve the parent chain by walking the "A / B" folder path —
-            // a name lookup would never match for nested folders (and could
-            // match a same-named category at the wrong depth)
-            $catParentId = $this->resolveOrCreatePath(
-                $group['parent_folder'],
-                $options['parent_category_id'] ?? null,
-                $pathCache,
-                $imported,
-                $nextSortOrder,
-            );
-
-            // Look for existing category matching name AND parent
-            $categoryQuery = Category::where('name', $categoryName);
-            if ($catParentId) {
-                $categoryQuery->where('parent_id', $catParentId);
+            if ($functionalMode) {
+                $catParentId = $parentCategoryId;
             } else {
-                $categoryQuery->whereNull('parent_id');
-            }
-            $category = $categoryQuery->first();
-
-            if (! $category) {
-                $category = $this->createCategoryWithRetry($categoryName, $catParentId, $imported, $nextSortOrder);
+                // Resolve the parent chain by walking the "A / B" folder path —
+                // a name lookup would never match for nested folders (and could
+                // match a same-named category at the wrong depth)
+                $catParentId = $this->resolveOrCreatePath(
+                    $group['parent_folder'],
+                    $parentCategoryId,
+                    $pathCache,
+                    $imported,
+                    $nextSortOrder,
+                );
             }
 
             foreach ($group['bookmarks'] as $bookmark) {
-                $url = $bookmark['url'];
+                $categoryName = $functionalMode ? $this->classifyBookmark($bookmark) : ($group['folder'] ?: '未分类书签');
+                $category = $this->firstOrCreateCategory($categoryName, $catParentId, $imported, $nextSortOrder, $categoryCache);
+                $url = mb_substr($bookmark['url'], 0, 255);
 
                 if ($skipDuplicate && isset($existingUrls[$url])) {
                     $imported['skipped']++;
@@ -355,6 +356,7 @@ class BookmarkParserService
                         'title' => $bookmark['title'],
                         'url' => $url,
                         'description' => '',
+                        'favicon_url' => $this->faviconUrl($url),
                         'is_public' => true,
                         'is_active' => true,
                         'sort_order' => 0,
@@ -374,6 +376,88 @@ class BookmarkParserService
         }
 
         return $imported;
+    }
+
+    private function firstOrCreateCategory(string $name, ?int $parentId, array &$imported, int &$nextSortOrder, array &$categoryCache = [], array $attributes = []): Category
+    {
+        $cacheKey = ($parentId ?? 'root').':'.$name;
+        if (isset($categoryCache[$cacheKey])) {
+            return $categoryCache[$cacheKey];
+        }
+
+        $categoryQuery = Category::where('name', $name);
+        if ($parentId) {
+            $categoryQuery->where('parent_id', $parentId);
+        } else {
+            $categoryQuery->whereNull('parent_id');
+        }
+        $category = $categoryQuery->first();
+
+        if (! $category) {
+            $category = $this->createCategoryWithRetry($name, $parentId, $imported, $nextSortOrder, $attributes);
+        } elseif ($attributes) {
+            $category->forceFill($attributes)->save();
+        }
+
+        $categoryCache[$cacheKey] = $category;
+
+        return $category;
+    }
+
+    private function classifyBookmark(array $bookmark): string
+    {
+        $text = strtolower($bookmark['title'].' '.$bookmark['url']);
+
+        $groups = $this->functionalGroups();
+
+        foreach ($groups as $name => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, strtolower($keyword))) {
+                    return $name;
+                }
+            }
+        }
+
+        return '其他收藏';
+    }
+
+    public static function functionalGroups(): array
+    {
+        return [
+            'AI 工具与模型' => ['chatgpt', 'claude', 'poe.com', 'kimi', 'deepseek', 'chatglm', '智谱', 'doubao', 'qwen', '通义', '文心', 'minimax', 'perplexity', 'coze', 'ollama', 'maton', 'clawhub', 'ddcatai', 'fogsight', 'huggingface', 'modelscope', 'siliconflow', 'bigmodel', 'openai', 'anthropic', 'gemini', 'ai ', 'ai-', 'aigc', 'prompt', '提示词', '大模型', '模型', '智能体'],
+            'AI 编程与在线开发' => ['cursor', 'codebuddy', 'github copilot', 'copilot', 'bolt.new', 'v0.dev', 'replit', 'trae', 'same.new', 'stackblitz', 'codesandbox', 'coding.net', 'ai 编程'],
+            '搜索导航与资讯' => ['google.', 'bing.', 'baidu.', 'duckduckgo', 'yandex', 'sogou', '360.cn', 'search', 'fsou', 'tophub', 'kadaza', 'readfar', 'wanandroid', '528btc', 'echotik', '搜索', '导航', '今日热榜', '资讯'],
+            '翻译语言与学习' => ['translate', 'fanyi', 'deepl', 'youdao', 'cpta', 'zikao', 'eeagd', 'jiaoshi', 'ouchn', 'hqjy', 'course', 'learn', 'summerclassical', '有道翻译', '谷歌翻译', '翻译', '考试', '自考', '教育', '网校', '学习'],
+            '开发文档与教程' => ['docs.', 'developer.', 'tutorial', 'mdn', 'w3school', 'runoob', 'kancloud', 'roadmap.sh', 'free-for.dev', 'modelcontextprotocol', 'prismic', 'harmonyos', 'element.eleme.cn', 'zhinin', '文档', '教程', '手册'],
+            '前端开发' => ['vue', 'react', 'angular', 'svelte', 'element-plus', 'element.eleme', 'antdv', 'naive', 'vant', 'vite', 'webpack', 'parcel', 'tailwind', 'bootstrap', 'css', 'html', 'javascript', 'typescript', 'nodejs', 'npm', 'pnpm', 'yarn', 'gsap', 'taro', 'uni-app', 'three.js', 'webgl', 'animxyz', 'wow.js', 'madewith', 'fff.cmiscm', 'gridea', '前端', '组件库'],
+            '后端接口与数据库' => ['php', 'laravel', 'java', 'spring', 'python', 'django', 'flask', 'go.dev', 'golang', 'rust', 'api', 'mysql', 'postgres', 'postgresql', 'redis', 'mongodb', 'mongoose', 'sqlite', 'mock.js', 'easy mock', '接口', '后端', '数据库', '缓存'],
+            '代码托管与开源社区' => ['github', 'gitlab', 'gitee', 'bitbucket', 'stackoverflow', 'stack overflow', 'packagist', 'npmjs', 'openatom', 'openharmony', 'openi', 'osrc', '开源', '代码'],
+            '技术博客与社区' => ['csdn', 'juejin', 'cnblogs', 'jianshu', 'segmentfault', 'hashnode', '掘金', '博客园', '简书', '技术博客'],
+            '建站 CMS 与商城系统' => ['wordpress', 'drupal', 'joomla', 'cms', 'woocommerce', 'elementor', 'crmeb', 'beikeshop', 'kadence', 'wpgraphql', 'thinkcmf', 'shopify', 'amazon', 'aliexpress', 'dhgate', 'ebay', 'etsy', '1688', 'taobao', 'tmall', 'maoshop', '大白杂货铺', '淘宝', '天猫', '建站', '商城', '电商', '主题', '插件'],
+            '后台低代码与业务系统' => ['admin', 'naiveadmin', 'likeadmin', 'lowcode', 'low-code', 'ruoyi', 'magic-boot', 'form-create', 'vform', 'configureid', 'vika.cn', 'zion', 'axshare', 'inffni', 'inffnisys', 'moredian', 'glee.firefliesnight', 'dzx.os.gs.cn', 'shengwang', '声网', '工单', '商家管理', '个人中心', '后台管理', '低代码', '后台模板', '管理后台', '动态表单', '表单'],
+            '云服务器与部署' => ['aws', 'azure', 'google cloud', 'aliyun', '腾讯云', 'cloud.tencent', 'qiniu', 'cloudflare', 'vultr', 'volcengine', '3v.do', 'free.3v', '49.51.', 'vercel', 'netlify', 'server', 'vps', 'host', '主机', '云服务', '部署'], 
+            '运维安全与域名' => ['docker', 'docker hub', 'kubernetes', 'jenkins', 'nginx', 'apache', 'linux', 'ssl', 'dns', 'domain', 'whois', 'httpstatus', 'myip', 'idcicp', '1panel', 'lpanel', '域名', '运维', '安全'],
+            '在线工具与效率' => ['json.cn', 'json', 'tinyjpg', 'pagespeed', 'staticfile', 'cdn', 'compress', 'format', 'gradient', 'shapefactory', 'ip138', 'jiejingku', 'dayin.page', 'baominggongju', '格式化', '压缩', '在线工具', '查询', '打印', '快捷指令'],
+            '设计素材与原型' => ['figma', 'mastergo', 'lanhuapp', 'sketch', 'mockplus', 'framer', 'albacub', 'iconfont', 'icon', 'font', 'dribbble', 'behance', 'wallspic', 'ui', 'ux', 'design', '原型', '设计协作', '蓝湖', '壁纸', '素材', '图标', '字体', '设计'],
+            '办公协作与知识库' => ['notion', 'trello', 'jira', 'asana', 'clickup', 'yuque', 'project', 'microsoft', 'volta', 'zoho', 'contentful', '腾讯会议', 'meeting.tencent', '会议', '录制文件', '知识库', '协作', '项目'],
+            '邮箱通讯与客服 CRM' => ['slack', 'dingtalk', 'feishu', 'lark', 'mail.', 'mailchimp', 'gmail', 'outlook.live', '126.com', '163.com', 'qq.com', 'brevo', 'tidio', 'crm', 'forms', 'support.', 'help center', 'portal', '飞书', '钉钉', '邮箱', '客服'], 
+            'SEO 统计与营销' => ['seo', 'semrush', 'ahrefs', 'similarweb', 'search console', 'analytics', 'google ads', 'adwords', 'adsense', 'facebook ads', 'pixel', 'tag manager', 'tongji', '站长', '收录', '关键词', '流量', '统计', '投放', '广告', '营销'],
+            '支付金融与 Web3' => ['paypal', 'stripe', 'payoneer', 'wise.com', 'worldfirst', 'metamask', 'opensea', 'nft', 'crypto', 'bayc', 'blockpulse', 'za bank', 'alipay', 'wechatpay', '支付', '收款', '金融'],
+            '政务法律与企业服务' => ['gov.cn', 'yidaiyilu', 'inanshan', 'szyouth', 'qixin', '企查查', '天眼查', 'yuanpailaw', 'minglvshi', '律师', '法律', '工商', '企业查询', '政务', '公共服务', '人才服务'],
+            '影音社交与内容平台' => ['bilibili', 'youtube', 'douyin', 'tiktok', 'vimeo', 'spotify', 'podcast', 'twitter', 'x.com', 'facebook', 'instagram', 'discord', 'zhihu', 'weibo', 'xiaohongshu', 'ferryboat', 'fairy.id', 'sunwk', '摆渡人', '西游', '江湖', '小红书', '知乎', '微博', '直播', '视频', '音频', '社交', '内容', '博客'],
+            '生活娱乐与票务' => ['damai', 'jhzajc', 'qiumi', 'halihali', 'pzds', 'pnyouying', '有小象', 'komc', '科麦', '游戏账号', '虚拟财产', '游戏交易', '影视', '演出', '赛事', '票务', '生活'],
+            '文件传输与软件下载' => ['cowtransfer', 'msdn', 'itellyou', 'macwk', 'macyy', 'xclient', 'macbl', '52pojie', '吾爱破解', 'weiyun', 'download', '软件下载', '文件传输', '快传', '破解软件', 'mac应用'], 
+            '网络代理与本地服务' => ['clash', 'veee', 'mielink', 'bananapro', 'jike491', '192.168.', '172.16.', 'localhost', '127.0.0.1', '101.200.', '43.139.', '81.71.', '233.gr', 'oa.', '机场', '代理', '加速', '内网', '本地'], 
+            '硬件设备与地图可视化' => ['bambulab', 'dobot', 'robot', 'arduino', 'raspberry', 'ifixit', 'mapbox', 'amap', 'baidu map', 'google maps', 'echarts', 'd3', '树莓派', '硬件', '机器人', '3d printer', '修理', '地图', '地理', '可视化'],
+            '外包招聘与副业' => ['upwork', 'epwk', 'yuanjisong', 'proginn', 'freelance', '17yongai', '招聘', '外包', '接私活', '兼职', '副业'],
+        ];
+    }
+
+    private function faviconUrl(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST) ?: $url;
+
+        return 'https://t2.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=64&url='.urlencode('https://'.$host);
     }
 
     /**
@@ -426,17 +510,17 @@ class BookmarkParserService
      * the same slug, and the retry keeps one collision from rolling back the
      * whole import transaction.
      */
-    private function createCategoryWithRetry(string $name, ?int $parentId, array &$imported, int &$nextSortOrder): Category
+    private function createCategoryWithRetry(string $name, ?int $parentId, array &$imported, int &$nextSortOrder, array $attributes = []): Category
     {
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
-                $category = Category::create([
+                $category = Category::create(array_merge([
                     'name' => $name,
                     'slug' => $this->generateSlug($name),
                     'is_active' => true,
                     'sort_order' => $nextSortOrder++,
                     'parent_id' => $parentId,
-                ]);
+                ], $attributes));
                 $imported['categories']++;
 
                 return $category;

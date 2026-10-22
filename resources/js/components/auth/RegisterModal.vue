@@ -18,13 +18,25 @@
         </div>
         <div class="auth-field">
           <label>密码</label>
-          <input v-model="password" type="password" placeholder="至少8位，需含大小写字母、数字及特殊字符" required autocomplete="new-password" @blur="touched.password = true" />
+          <div class="auth-password-field">
+            <input v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="至少8位，需含大小写字母、数字及特殊字符" required autocomplete="new-password" @blur="touched.password = true" />
+            <button type="button" class="auth-password-toggle" @click="showPassword = !showPassword" :aria-label="showPassword ? '隐藏密码' : '显示密码'">
+              <svg v-if="showPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
           <PasswordStrength :password="password" />
           <div v-if="touched.password && passwordError" class="auth-hint auth-hint-error">{{ passwordError }}</div>
         </div>
         <div class="auth-field">
           <label>确认密码</label>
-          <input v-model="passwordConfirmation" type="password" placeholder="再次输入密码" required autocomplete="new-password" @blur="touched.confirm = true" />
+          <div class="auth-password-field">
+            <input v-model="passwordConfirmation" :type="showPasswordConfirmation ? 'text' : 'password'" placeholder="再次输入密码" required autocomplete="new-password" @blur="touched.confirm = true" />
+            <button type="button" class="auth-password-toggle" @click="showPasswordConfirmation = !showPasswordConfirmation" :aria-label="showPasswordConfirmation ? '隐藏确认密码' : '显示确认密码'">
+              <svg v-if="showPasswordConfirmation" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
           <div v-if="touched.confirm && confirmError" class="auth-hint auth-hint-error">{{ confirmError }}</div>
         </div>
         <div v-if="error" class="auth-error">{{ error }}</div>
@@ -54,6 +66,8 @@ const name = ref('');
 const email = ref('');
 const password = ref('');
 const passwordConfirmation = ref('');
+const showPassword = ref(false);
+const showPasswordConfirmation = ref(false);
 const error = ref('');
 const loading = ref(false);
 const touched = reactive({ name: false, email: false, password: false, confirm: false });

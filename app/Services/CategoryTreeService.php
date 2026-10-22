@@ -42,20 +42,36 @@ class CategoryTreeService
             ->get()
             ->keyBy('id');
 
-        $allCategories->each(function ($category) use ($sitesByCategory) {
-            $category->sites = $sitesByCategory->get($category->id, collect());
-        });
-
         $childCategories = $allCategories->filter(fn ($c) => $c->parent_id !== null);
         $parentCategories = $allCategories->filter(fn ($c) => $c->parent_id === null);
 
-        return $parentCategories->map(function ($parent) use ($childCategories) {
-            $parent->children = $childCategories->where('parent_id', $parent->id)->values();
+        return $parentCategories
+            ->sortBy(fn ($category) => $category->name === '导入书签' ? -1 : $category->sort_order)
+            ->map(function ($parent) use ($childCategories, $sitesByCategory) {
+            $sites = $sitesByCategory->get($parent->id, collect())->values()->toArray();
+            $children = $childCategories
+                ->where('parent_id', $parent->id)
+                ->values()
+                ->map(function ($child) use ($sitesByCategory) {
+                    $childArray = $child->toArray();
+                    $childArray['sites'] = $sitesByCategory->get($child->id, collect())->values()->toArray();
+                    $childArray['children'] = [];
 
-            return $parent;
-        })->filter(fn ($c) => $c->sites->isNotEmpty() || $c->children->isNotEmpty())
+                    return $childArray;
+                })
+                ->all();
+
+            if (empty($sites) && empty($children)) {
+                return null;
+            }
+
+            $parentArray = $parent->toArray();
+            $parentArray['sites'] = $sites;
+            $parentArray['children'] = $children;
+
+            return $parentArray;
+        })->filter()
             ->values()
-            ->map(fn ($category) => $category->toArray())
             ->all();
     }
 }

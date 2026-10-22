@@ -21,10 +21,26 @@ export const useCategoryStore = defineStore('categories', {
          *  consumers (e.g. search suggestions) don't rebuild it per keystroke. */
         flatSites(state) {
             const sites = [];
-            const walk = (cats) => {
+            const cleanName = (name) => (name || '').replace(/[🔥💻🎮📌]/g, '');
+            const hostname = (url) => {
+                try {
+                    return new URL(url).hostname.replace(/^www\./, '');
+                } catch {
+                    return '';
+                }
+            };
+            const walk = (cats, parents = []) => {
                 for (const cat of cats) {
-                    if (cat.sites) sites.push(...cat.sites);
-                    if (cat.children) walk(cat.children);
+                    const path = [...parents, cleanName(cat.name)];
+                    if (cat.sites) {
+                        sites.push(...cat.sites.map(site => ({
+                            ...site,
+                            category_path: path.join(' / '),
+                            category_name: cleanName(cat.name),
+                            domain: hostname(site.url),
+                        })));
+                    }
+                    if (cat.children) walk(cat.children, path);
                 }
             };
             walk(state.categories);
@@ -39,6 +55,7 @@ export const useCategoryStore = defineStore('categories', {
                 hasChildren: cat.children && cat.children.length > 0,
                 children: (cat.children || []).map(child => ({
                     id: child.id,
+                    parentId: cat.id,
                     name: child.name,
                 })),
             }));

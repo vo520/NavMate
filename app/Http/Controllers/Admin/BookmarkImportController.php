@@ -38,13 +38,22 @@ class BookmarkImportController extends Controller
 
         try {
             $html = $request->file('bookmark_file')->getContents();
-            $result = $this->parser->preview($html);
+            $preview = $this->parser->preview($html);
+            $result = [
+                'total_bookmarks' => $preview['stats']['total_bookmarks'],
+                'total_folders' => $preview['stats']['total_folders'],
+                'folders' => array_map(fn ($folder) => [
+                    'name' => $folder['folder'],
+                    'children' => $folder['samples'],
+                    'count' => $folder['count'],
+                ], $preview['preview']),
+            ];
 
             // Cache parsed result using a unique key (avoid bloating session)
             $cacheKey = 'bookmark_preview:'.$request->session()->getId();
             Cache::put($cacheKey, $html, 1800); // 30 min TTL
 
-            return response()->json($result);
+            return response()->json(['code' => 0, 'data' => $result]);
         } catch (\Exception $e) {
             return response()->json(['error' => '书签文件解析失败，请检查文件格式'], 500);
         }
@@ -72,6 +81,7 @@ class BookmarkImportController extends Controller
                 return $this->parser->import($html, [
                     'skip_duplicate' => $request->boolean('skip_duplicate', true),
                     'parent_category_id' => $request->input('parent_category_id'),
+                    'import_mode' => 'functional',
                 ]);
             });
 

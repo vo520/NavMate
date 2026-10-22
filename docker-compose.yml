@@ -1,0 +1,50 @@
+name: navmate_local
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: navmate-local-app
+    ports:
+      - "18080:80"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:18080
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: navmate_local
+      DB_USERNAME: navmate_local
+      DB_PASSWORD: navmate_local_password
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - navmate_local_storage:/var/www/html/storage
+    restart: unless-stopped
+
+  mysql:
+    image: registry.cn-guangzhou.aliyuncs.com/likeadmin/mysql:5.7.44
+    container_name: navmate-local-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: navmate_local_root_password
+      MYSQL_DATABASE: navmate_local
+      MYSQL_USER: navmate_local
+      MYSQL_PASSWORD: navmate_local_password
+    volumes:
+      - navmate_local_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pnavmate_local_root_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+volumes:
+  navmate_local_storage:
+  navmate_local_mysql:

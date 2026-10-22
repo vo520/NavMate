@@ -112,4 +112,26 @@ class BookmarkImportParserTest extends TestCase
         $this->assertSame(2, $result['sites']);
         $this->assertSame(1, Site::where('url', 'https://loose.example.com')->count());
     }
+
+    public function test_functional_import_keeps_bookmarks_visible_under_first_level_categories(): void
+    {
+        $result = $this->service->import($this->nestedHtml, ['import_mode' => 'functional']);
+
+        $this->assertSame(3, $result['sites']);
+
+        $root = Category::where('name', '导入书签')->first();
+        $this->assertNotNull($root);
+        $this->assertNull($root->parent_id);
+
+        $categories = Category::where('parent_id', $root->id)->pluck('name')->all();
+        $this->assertContains('CMS 与建站', $categories);
+        $this->assertContains('前端开发', $categories);
+        $this->assertContains('其他收藏', $categories);
+        $this->assertSame(0, Site::whereNull('favicon_url')->count());
+
+        $siteCategoryIds = Site::pluck('category_id')->unique()->all();
+        $deepCategoryCount = Category::whereIn('id', $siteCategoryIds)->whereNot('parent_id', $root->id)->count();
+        $this->assertSame(0, $deepCategoryCount);
+        $this->assertSame(0, Category::whereNotNull('parent_id')->whereNot('parent_id', $root->id)->count());
+    }
 }

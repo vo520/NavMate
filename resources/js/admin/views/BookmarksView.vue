@@ -1,47 +1,56 @@
 <template>
   <div>
-    <div class="admin-card bookmark-card">
-      <div class="bookmark-title"><ImportOutlined style="color: var(--admin-primary)" /> 书签导入</div>
+    <PageToolbar>
+      <template #left>
+        <div class="toolbar-title"><ImportOutlined /> 书签导入</div>
+        <span class="toolbar-hint">支持 Chrome / Firefox / Edge 导出的 HTML 书签文件</span>
+      </template>
+      <template #right>
+        <a-button v-if="previewData || importResult" @click="resetImport">重新选择</a-button>
+      </template>
+    </PageToolbar>
 
+    <div class="admin-card bookmark-card">
       <div class="bookmark-body">
         <!-- 上传区 -->
-        <div v-if="!previewData && !importResult">
+        <div v-if="!previewData && !importResult" class="upload-section">
           <a-upload-dragger
             name="bookmark_file"
             :accept="['.html', '.htm']"
             :max-count="1"
             :before-upload="beforeUpload"
             :customRequest="handleUpload"
+            :disabled="previewing"
           >
             <p class="ant-upload-drag-icon">
               <InboxOutlined style="font-size: 48px; color: var(--admin-primary)" />
             </p>
-            <p class="upload-text">点击或拖拽上传书签文件</p>
+            <p class="upload-text">{{ previewing ? '正在解析书签文件...' : '点击或拖拽上传书签文件' }}</p>
             <p class="upload-hint">支持 Chrome / Firefox / Edge 导出的 HTML 书签文件</p>
           </a-upload-dragger>
         </div>
 
         <!-- 预览 -->
-        <div v-if="previewData" class="preview-section">
+        <div v-if="previewData && !importResult" class="preview-section">
           <a-divider>预览结果</a-divider>
           <a-row :gutter="16">
-            <a-col :span="12">
+            <a-col :xs="24" :sm="12">
               <div class="preview-stat">
                 <div class="preview-stat-value">{{ previewData.total_bookmarks || 0 }}</div>
                 <div class="preview-stat-label">书签数</div>
               </div>
             </a-col>
-            <a-col :span="12">
+            <a-col :xs="24" :sm="12">
               <div class="preview-stat">
                 <div class="preview-stat-value">{{ previewData.total_folders || 0 }}</div>
                 <div class="preview-stat-label">文件夹</div>
               </div>
             </a-col>
           </a-row>
-          <a-checkbox v-model:checked="skipDuplicates" style="margin: 16px 0">跳过重复书签</a-checkbox>
+          <a-checkbox v-model:checked="skipDuplicates" class="skip-checkbox">跳过重复书签</a-checkbox>
           <div class="folder-preview">
             <div v-for="folder in previewData.folders" :key="folder.name" class="folder-item">
-              <div class="folder-name">{{ folder.name }} ({{ folder.children ? folder.children.length : 0 }})</div>
+              <div class="folder-name">{{ folder.name }} ({{ folder.count || 0 }})</div>
               <div class="folder-tags">
                 <a-tag v-for="item in (folder.children || []).slice(0, 5)" :key="item.title">{{ item.title }}</a-tag>
                 <span v-if="(folder.children || []).length > 5" class="more-hint">...等 {{ (folder.children || []).length - 5 }} 个</span>
@@ -69,11 +78,13 @@
 import { ref } from 'vue';
 import { message } from 'antdv-next';
 import request from '../utils/request';
+import PageToolbar from '../components/PageToolbar.vue';
 import { InboxOutlined, ImportOutlined } from '@ant-design/icons-vue';
 
 const previewData = ref(null);
 const importResult = ref(null);
 const skipDuplicates = ref(true);
+const previewing = ref(false);
 const importing = ref(false);
 // Hold the original File object so preview and import use the exact same
 // source. Previously import rebuilt a Blob from an async FileReader result,
@@ -88,6 +99,7 @@ function beforeUpload(file) {
 
 async function handleUpload(options) {
   bookmarkFile = options.file;
+  previewing.value = true;
   const formData = new FormData();
   formData.append('bookmark_file', bookmarkFile);
   try {
@@ -98,6 +110,8 @@ async function handleUpload(options) {
     message.success('解析成功');
   } catch {
     // 错误提示已由 request 拦截器统一弹出
+  } finally {
+    previewing.value = false;
   }
   return false;
 }
@@ -116,6 +130,8 @@ async function handleImport() {
       params: { skip_duplicate: skipDuplicates.value },
     });
     importResult.value = data;
+    previewData.value = null;
+    bookmarkFile = null;
     message.success('导入成功');
   } catch {
     // 错误提示已由 request 拦截器统一弹出
@@ -124,22 +140,33 @@ async function handleImport() {
   }
 }
 
-function resetPreview() { previewData.value = null; importResult.value = null; }
-function resetImport() { previewData.value = null; importResult.value = null; }
+function resetPreview() { previewData.value = null; importResult.value = null; bookmarkFile = null; }
+function resetImport() { previewData.value = null; importResult.value = null; bookmarkFile = null; skipDuplicates.value = true; }
 </script>
 
 <style scoped>
 .bookmark-card { overflow: hidden; }
 
-.bookmark-title {
-  padding: 16px 24px;
+.toolbar-title {
+  display: flex; align-items: center; gap: 8px;
   font-size: 16px; font-weight: 600;
   color: var(--admin-card-foreground);
-  border-bottom: 1px solid var(--admin-border-light);
-  display: flex; align-items: center; gap: 8px;
 }
 
+.toolbar-title :deep(.anticon) { color: var(--admin-primary); }
+
+.toolbar-hint { font-size: 13px; color: var(--admin-muted-foreground); }
+
 .bookmark-body { padding: 24px; }
+
+.upload-section :deep(.ant-upload-drag) {
+  background: var(--admin-card);
+  border-color: var(--admin-border);
+}
+
+.upload-section :deep(.ant-upload-drag:hover) { border-color: var(--admin-primary); }
+
+.upload-section :deep(.ant-upload-disabled) { cursor: wait; }
 
 .upload-text {
   font-size: 16px; font-weight: 600;
@@ -151,9 +178,12 @@ function resetImport() { previewData.value = null; importResult.value = null; }
 
 .preview-section { margin-top: 8px; }
 
+.skip-checkbox { margin: 0 0 16px; }
+
 .preview-stat {
   text-align: center; padding: 16px;
   background: var(--admin-muted); border-radius: var(--admin-radius);
+  margin-bottom: 16px;
 }
 
 .preview-stat-value {
@@ -165,7 +195,10 @@ function resetImport() { previewData.value = null; importResult.value = null; }
 }
 
 .folder-preview { margin-top: 16px; }
-.folder-item { margin-bottom: 12px; }
+.folder-item {
+  margin-bottom: 12px; padding: 12px;
+  background: var(--admin-muted); border-radius: var(--admin-radius-md);
+}
 .folder-name {
   font-weight: 600; font-size: 14px;
   color: var(--admin-card-foreground); margin-bottom: 6px;

@@ -24,7 +24,7 @@
                 href="#"
                 class="sidebar-link sub-link"
                 :class="{ active: activeId === child.id }"
-                @click.prevent="scrollTo(child.id)"
+                @click.prevent="scrollTo(child.parentId, child.id)"
               >
                 <span class="sidebar-text">{{ child.name }}</span>
               </a>
@@ -50,6 +50,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCategoryStore } from '../stores/categories';
+import { useLayoutStore } from '../stores/layout';
 import { useAdsStore } from '../stores/ads';
 import AdBanner from './AdBanner.vue';
 
@@ -60,24 +61,53 @@ const props = defineProps({
 const emit = defineEmits(['close-mobile', 'toggle-collapse']);
 
 const store = useCategoryStore();
+const layoutStore = useLayoutStore();
 const adsStore = useAdsStore();
 const activeId = ref(null);
 const expandedId = ref(null);
 
-const sidebarItems = computed(() => store.sidebarItems);
+const sidebarItems = computed(() => {
+  const items = store.sidebarItems;
+  if (!layoutStore.loaded || layoutStore.data.length === 0) return items;
+
+  const layoutMap = {};
+  layoutStore.data.forEach(item => {
+    layoutMap[item.category_id] = item;
+  });
+
+  return items
+    .filter(item => {
+      const layout = layoutMap[item.id];
+      return !layout || layout.visible !== false;
+    })
+    .map(item => {
+      const layout = layoutMap[item.id];
+      return { ...item, _sort: layout ? layout.sort_order : 999 };
+    })
+    .sort((a, b) => a._sort - b._sort);
+});
 
 function toggleCat(cat) {
   if (cat.hasChildren) {
     expandedId.value = expandedId.value === cat.id ? null : cat.id;
+    const firstChild = cat.children?.[0];
+    scrollTo(cat.id, firstChild?.id || cat.id);
+    return;
   }
   scrollTo(cat.id);
 }
 
-function scrollTo(catId) {
-  activeId.value = catId;
+function scrollTo(catId, activeCatId = catId) {
+  activeId.value = activeCatId;
+  window.dispatchEvent(new CustomEvent('navmate:select-category', {
+    detail: { parentId: catId, categoryId: activeCatId },
+  }));
   const el = document.getElementById('section-' + catId);
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const headerHeight = document.querySelector('.main-header')?.offsetHeight || 0;
+    const offset = headerHeight + 24;
+    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
   }
   emit('close-mobile');
 }

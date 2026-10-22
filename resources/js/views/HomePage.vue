@@ -2,14 +2,15 @@
   <div class="home-page">
     <div class="content-area">
       <!-- Search results overlay -->
-      <div v-if="hasSearch" class="content-section">
+      <div v-if="hasSearch" ref="searchSection" class="content-section">
         <div class="section-header">
           <h4 class="section-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             搜索结果
+            <span v-if="searchKeyword" class="search-keyword-pill">{{ searchKeyword }}</span>
             <span class="search-result-count" v-if="!filtering">（{{ searchResults.length }} 个）</span>
           </h4>
-          <button class="search-clear-btn" @click="clearSearch">清除搜索</button>
+          <button class="search-clear-btn" @click="clearSearch">退出搜索</button>
         </div>
         <div v-if="filtering" class="loading-state">搜索中...</div>
         <div v-else-if="searchResults.length === 0" class="section-empty">未找到相关结果</div>
@@ -57,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useCategoryStore } from '../stores/categories';
 import { useLayoutStore } from '../stores/layout';
 import { useSearchStore } from '../stores/search';
@@ -71,6 +72,7 @@ const store = useCategoryStore();
 const layoutStore = useLayoutStore();
 const searchStore = useSearchStore();
 const adsStore = useAdsStore();
+const searchSection = ref(null);
 
 const AD_INTERVAL = 3;
 
@@ -114,6 +116,20 @@ const error = computed(() => store.error);
 const searchResults = computed(() => searchStore.searchResults);
 const filtering = computed(() => searchStore.filtering);
 const hasSearch = computed(() => searchStore.searched || searchStore.filtering);
+const searchKeyword = computed(() => searchStore.keyword.trim());
+
+watch(hasSearch, (visible) => {
+  if (!visible) return;
+
+  nextTick(() => {
+    const el = searchSection.value;
+    if (!el) return;
+
+    const headerHeight = document.querySelector('.main-header')?.offsetHeight || 0;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 24;
+    window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+  });
+});
 
 function clearSearch() {
   searchStore.clearSearch();
