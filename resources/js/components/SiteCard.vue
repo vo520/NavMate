@@ -1,13 +1,5 @@
 <template>
-  <a
-    :href="site.url"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="site-card"
-    :aria-label="'访问 ' + site.title"
-    :title="site.title"
-    @click="trackClick"
-  >
+  <article class="site-card">
     <button
       v-if="authStore.isAuthenticated"
       class="site-fav"
@@ -29,17 +21,27 @@
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
     </button>
     <span v-if="copied" class="site-copy-toast">已复制</span>
-    <div class="site-favicon">
-      <img v-if="site.favicon_url && !imgError" :src="site.favicon_url" :alt="site.title" loading="lazy" @error="imgError = true" />
-      <span v-else class="site-favicon-letter">{{ firstLetter }}</span>
-    </div>
-    <div class="site-info">
-      <span class="site-name" :title="site.title">{{ site.title }}</span>
-      <span class="site-desc" v-if="site.description" :title="site.description">{{ site.description }}</span>
-      <span class="site-domain" v-else-if="displayDomain" :title="site.url">{{ displayDomain }}</span>
-    </div>
-    <span class="site-goto">&#8599;</span>
-  </a>
+    <a
+      :href="site.url"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="site-card-main"
+      :aria-label="'访问 ' + site.title"
+      :title="site.title"
+      @click="trackClick"
+    >
+      <div class="site-favicon">
+        <img v-if="site.favicon_url && !imgError" :src="site.favicon_url" :alt="site.title" loading="lazy" @error="imgError = true" />
+        <span v-else class="site-favicon-letter">{{ firstLetter }}</span>
+      </div>
+      <div class="site-info">
+        <span class="site-name" :title="site.title">{{ site.title }}</span>
+        <span class="site-desc" v-if="site.description" :title="site.description">{{ site.description }}</span>
+        <span class="site-domain" v-else-if="displayDomain" :title="site.url">{{ displayDomain }}</span>
+      </div>
+      <span class="site-goto">&#8599;</span>
+    </a>
+  </article>
 </template>
 
 <script setup>

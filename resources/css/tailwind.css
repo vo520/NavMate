@@ -779,13 +779,27 @@ a { color: inherit; text-decoration: none; }
     opacity: 1;
 }
 
-.site-card > .site-favicon,
-.site-card > .site-info,
-.site-card > .site-goto,
+.site-card > .site-card-main,
 .site-card > .site-copy,
 .site-card > .site-copy-toast {
     position: relative;
     z-index: 1;
+}
+
+.site-card-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+}
+
+.site-card-main:focus-visible {
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), 0.16);
 }
 
 .site-favicon {
@@ -860,7 +874,8 @@ a { color: inherit; text-decoration: none; }
     transition: opacity 0.2s;
 }
 
-.site-card:hover .site-goto {
+.site-card:hover .site-goto,
+.site-card-main:focus-visible .site-goto {
     opacity: 0.6;
 }
 
