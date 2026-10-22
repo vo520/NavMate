@@ -1520,6 +1520,10 @@ a { color: inherit; text-decoration: none; }
 
 .site-card:hover .site-copy,
 .site-card:hover .site-fav,
+.site-card:focus-within .site-copy,
+.site-card:focus-within .site-fav,
+.site-copy:focus,
+.site-fav:focus,
 .site-copy:focus-visible,
 .site-fav:focus-visible {
     opacity: 0.66;
@@ -1539,6 +1543,19 @@ a { color: inherit; text-decoration: none; }
 .site-fav.active {
     opacity: 1;
     color: #ef4444;
+}
+
+@media (hover: none), (pointer: coarse) {
+    .site-copy {
+        opacity: 0.72;
+        border-radius: 999px;
+        background: rgba(var(--theme-color-rgb), 0.08);
+    }
+
+    .site-card:hover .site-copy,
+    .site-copy.copied {
+        opacity: 1;
+    }
 }
 
 /* ===== Skeleton Loading ===== */

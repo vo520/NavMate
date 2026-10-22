@@ -34,9 +34,9 @@
       <span v-else class="site-favicon-letter">{{ firstLetter }}</span>
     </div>
     <div class="site-info">
-      <span class="site-name">{{ site.title }}</span>
-      <span class="site-desc" v-if="site.description">{{ site.description }}</span>
-      <span class="site-domain" v-else-if="displayDomain">{{ displayDomain }}</span>
+      <span class="site-name" :title="site.title">{{ site.title }}</span>
+      <span class="site-desc" v-if="site.description" :title="site.description">{{ site.description }}</span>
+      <span class="site-domain" v-else-if="displayDomain" :title="site.url">{{ displayDomain }}</span>
     </div>
     <span class="site-goto">&#8599;</span>
   </a>
