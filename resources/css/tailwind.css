@@ -782,7 +782,8 @@ a { color: inherit; text-decoration: none; }
 .site-card > .site-favicon,
 .site-card > .site-info,
 .site-card > .site-goto,
-.site-card > .site-copy {
+.site-card > .site-copy,
+.site-card > .site-copy-toast {
     position: relative;
     z-index: 1;
 }
@@ -1486,6 +1487,35 @@ a { color: inherit; text-decoration: none; }
 
 .site-fav {
     right: 38px;
+}
+
+.site-copy-toast {
+    position: absolute;
+    top: 8px;
+    right: 68px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(var(--theme-color-rgb), 0.12);
+    color: var(--theme-color);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.16);
+    animation: copy-toast-in 0.18s ease-out;
+    pointer-events: none;
+}
+
+@keyframes copy-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .site-card:hover .site-copy,
